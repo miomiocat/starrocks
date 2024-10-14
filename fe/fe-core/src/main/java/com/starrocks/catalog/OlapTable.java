@@ -3123,6 +3123,7 @@ public class OlapTable extends Table {
         analyzeRollupIndexMeta();
         tryToAssignIndexId();
         updateBaseCompactionForbiddenTimeRanges(false);
+        tableProperty.buildPartitionLiveNumber();
 
         if (tableProperty != null) {
             tableProperty.buildConstraint();
