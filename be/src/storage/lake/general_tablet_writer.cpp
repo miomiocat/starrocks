@@ -35,7 +35,8 @@ HorizontalGeneralTabletWriter::HorizontalGeneralTabletWriter(TabletManager* tabl
                                                              bool is_compaction, ThreadPool* flush_pool,
                                                              GlobalDictByNameMaps* global_dicts)
         : TabletWriter(tablet_mgr, tablet_id, std::move(schema), txn_id, is_compaction, flush_pool),
-          _global_dicts(global_dicts) {}
+          _global_dicts(global_dicts),
+          _is_compaction(is_compaction) {}
 
 HorizontalGeneralTabletWriter::~HorizontalGeneralTabletWriter() = default;
 
@@ -90,6 +91,11 @@ Status HorizontalGeneralTabletWriter::reset_segment_writer() {
         wopts.encryption_info = pair.info;
         opts.encryption_meta = std::move(pair.encryption_meta);
     }
+
+    if (_is_compaction) {
+        wopts.op_type = OperationKind::COMPACTION;
+    }
+
     ASSIGN_OR_RETURN(auto of, fs::new_writable_file(wopts, _tablet_mgr->segment_location(_tablet_id, name)));
     auto w = std::make_unique<SegmentWriter>(std::move(of), _seg_id++, _schema, opts);
     RETURN_IF_ERROR(w->init());
@@ -135,7 +141,8 @@ VerticalGeneralTabletWriter::VerticalGeneralTabletWriter(TabletManager* tablet_m
                                                          uint32_t max_rows_per_segment, bool is_compaction,
                                                          ThreadPool* flush_pool)
         : TabletWriter(tablet_mgr, tablet_id, std::move(schema), txn_id, is_compaction, flush_pool),
-          _max_rows_per_segment(max_rows_per_segment) {}
+          _max_rows_per_segment(max_rows_per_segment),
+          _is_compaction(is_compaction) {}
 
 VerticalGeneralTabletWriter::~VerticalGeneralTabletWriter() {
     auto st = wait_futures_finish();
@@ -286,6 +293,11 @@ StatusOr<std::shared_ptr<SegmentWriter>> VerticalGeneralTabletWriter::create_seg
         wopts.encryption_info = pair.info;
         opts.encryption_meta = std::move(pair.encryption_meta);
     }
+
+    if (_is_compaction) {
+        wopts.op_type = OperationKind::COMPACTION;
+    }
+
     ASSIGN_OR_RETURN(auto of, fs::new_writable_file(wopts, _tablet_mgr->segment_location(_tablet_id, name)));
     auto w = std::make_shared<SegmentWriter>(std::move(of), _seg_id++, _schema, opts);
     RETURN_IF_ERROR(w->init(column_indexes, is_key));
