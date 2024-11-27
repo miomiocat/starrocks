@@ -223,6 +223,7 @@ public class ConnectProcessor {
         ctx.getAuditEventBuilder().setEventType(EventType.AFTER_QUERY)
                 .setState(ctx.getState().toString())
                 .setErrorCode(ctx.getNormalizedErrorCode())
+                .setErrorMsg(ctx.getErrorMsg())
                 .setQueryTime(elapseMs)
                 .setReturnRows(ctx.getReturnRows())
                 .setStmtId(ctx.getStmtId())
@@ -660,6 +661,7 @@ public class ConnectProcessor {
         ctx.setStartTime();
         ctx.setResourceGroup(null);
         ctx.resetErrorCode();
+        ctx.resetErrorMsg();
 
         switch (command) {
             case COM_INIT_DB:
