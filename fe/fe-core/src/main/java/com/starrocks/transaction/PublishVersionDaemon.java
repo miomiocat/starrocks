@@ -407,6 +407,7 @@ public class PublishVersionDaemon extends FrontendDaemon {
                     continue;
                 }
                 publishingTransactions.add(txnId);
+                txnState.updateSendTaskTime();
                 CompletableFuture<Void> future = publishLakeTransactionAsync(txnState);
                 future.thenRun(() -> publishingTransactions.remove(txnId));
             }
@@ -432,6 +433,7 @@ public class PublishVersionDaemon extends FrontendDaemon {
                 List<Long> tableIdList = state.getTableIdList();
                 if (tableIdList.stream().noneMatch(publishingLakeTransactionsBatchTableId::contains)) {
                     publishingLakeTransactionsBatchTableId.addAll(tableIdList);
+                    state.updateSendTaskTime();
                     CompletableFuture<Void> future = publishLakeTransactionAsync(state);
                     future.thenRun(() -> tableIdList.forEach(publishingLakeTransactionsBatchTableId::remove));
                 }
@@ -457,7 +459,7 @@ public class PublishVersionDaemon extends FrontendDaemon {
                         continue;
                     }
                     publishingLakeTransactionsBatchTableId.add(tableId);
-
+                    txnStateBatch.updateSendTaskTime();
                     CompletableFuture<Void> future = publishLakeTransactionBatchAsync(txnStateBatch);
                     future.thenRun(() -> publishingLakeTransactionsBatchTableId.remove(tableId));
                 }
@@ -499,6 +501,7 @@ public class PublishVersionDaemon extends FrontendDaemon {
         return publishFuture.thenAccept(success -> {
             if (success) {
                 try {
+                    txnState.updatePublishTaskFinishTime();
                     globalTransactionMgr.finishTransaction(dbId, txnId, null);
                 } catch (UserException e) {
                     throw new RuntimeException(e);
@@ -745,6 +748,7 @@ public class PublishVersionDaemon extends FrontendDaemon {
         return publishFuture.thenAccept(success -> {
             if (success) {
                 try {
+                    txnStateBatch.updatePublishTaskFinishTime();
                     globalTransactionMgr.finishTransactionBatch(dbId, txnStateBatch, null);
                     // here create the job to drop txnLog, for the visibleVersion has been updated
                     submitDeleteTxnLogJob(txnStateBatch);
