@@ -73,8 +73,7 @@ public class PaimonTableTest {
                 result = partitions;
             }
         };
-        PaimonTable paimonTable = new PaimonTable("testCatalog", "testDB", "testTable", fullSchema,
-                paimonNativeTable, 100L);
+        PaimonTable paimonTable = new PaimonTable("testCatalog", "testDB", "testTable", fullSchema, paimonNativeTable);
         Map<String, String> properties = paimonTable.getProperties();
         Assert.assertEquals(0, properties.size());
         List<Column> partitionColumns = paimonTable.getPartitionColumns();
@@ -99,8 +98,7 @@ public class PaimonTableTest {
         };
         String dbName = "testDB";
         String tableName = "testTable";
-        PaimonTable paimonTable = new PaimonTable("testCatalog", dbName, tableName, fullSchema,
-                paimonNativeTable, 100L);
+        PaimonTable paimonTable = new PaimonTable("testCatalog", dbName, tableName, fullSchema, paimonNativeTable);
 
         TTableDescriptor tTableDescriptor = paimonTable.toThrift(null);
         Assert.assertEquals(tTableDescriptor.getDbName(), dbName);
@@ -111,10 +109,8 @@ public class PaimonTableTest {
     public void testEquals(@Mocked DataTable paimonNativeTable) {
         String dbName = "testDB";
         String tableName = "testTable";
-        PaimonTable table = new PaimonTable("testCatalog", dbName, tableName, null,
-                paimonNativeTable, 100L);
-        PaimonTable table2 = new PaimonTable("testCatalog", dbName, tableName, null,
-                paimonNativeTable, 100L);
+        PaimonTable table = new PaimonTable("testCatalog", dbName, tableName, null, paimonNativeTable);
+        PaimonTable table2 = new PaimonTable("testCatalog", dbName, tableName, null, paimonNativeTable);
         Assert.assertEquals(table, table2);
         Assert.assertEquals(table, table);
         Assert.assertNotEquals(table, null);
