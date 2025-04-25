@@ -82,6 +82,7 @@ public class Deployer {
     private final TDescriptorTable emptyDescTable;
     private final long deliveryTimeoutMs;
     private final boolean enablePlanSerializeConcurrently;
+    private final boolean enableDescTableCache;
 
     private final FailureHandler failureHandler;
     private final boolean needDeploy;
@@ -109,6 +110,7 @@ public class Deployer {
         this.failureHandler = failureHandler;
         this.needDeploy = needDeploy;
         this.enablePlanSerializeConcurrently = context.getSessionVariable().getEnablePlanSerializeConcurrently();
+        this.enableDescTableCache = context.getSessionVariable().isEnableDescTableCache();
     }
 
     public DeployState createFragmentExecStates(List<ExecutionFragment> concurrentFragments) {
@@ -234,10 +236,16 @@ public class Deployer {
             }
 
             TDescriptorTable curDescTable;
-            if (stageIndex < 2) {
-                curDescTable = jobSpec.getDescTable();
+            if (enableDescTableCache) {
+                if (stageIndex < 2) {
+                    curDescTable = jobSpec.getDescTable();
+                } else {
+                    curDescTable = emptyDescTable;
+                }
             } else {
-                curDescTable = emptyDescTable;
+                LOG.debug("Desc table cache has been disabled for query: {}, fragment: {}",
+                        DebugUtil.printId(jobSpec.getQueryId()), fragment.getFragmentId());
+                curDescTable = jobSpec.getDescTable();
             }
 
             for (FragmentInstance instance : stageInstances) {
