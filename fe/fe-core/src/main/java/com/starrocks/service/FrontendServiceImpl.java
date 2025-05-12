@@ -381,16 +381,20 @@ public class FrontendServiceImpl implements FrontendService.Iface {
             catalogName = params.getCatalog_name();
         }
 
-        MetadataMgr metadataMgr = GlobalStateMgr.getCurrentState().getMetadataMgr();
-        List<String> dbNames = metadataMgr.listDbNames(catalogName);
-        LOG.debug("get db names: {}", dbNames);
-
         UserIdentity currentUser;
         if (params.isSetCurrent_user_ident()) {
             currentUser = UserIdentity.fromThrift(params.current_user_ident);
         } else {
             currentUser = UserIdentity.createAnalyzedUserIdentWithIp(params.user, params.user_ip);
         }
+        ConnectContext ctx = new ConnectContext(null);
+        ctx.setQualifiedUser(currentUser.getUser());
+        ctx.setCurrentUserIdentity(currentUser);
+        ctx.setThreadLocalInfo();
+
+        MetadataMgr metadataMgr = GlobalStateMgr.getCurrentState().getMetadataMgr();
+        List<String> dbNames = metadataMgr.listDbNames(catalogName);
+        LOG.debug("get db names: {}", dbNames);
 
         List<String> dbs = new ArrayList<>();
         for (String fullName : dbNames) {
@@ -434,15 +438,19 @@ public class FrontendServiceImpl implements FrontendService.Iface {
             catalogName = params.getCatalog_name();
         }
 
-        MetadataMgr metadataMgr = GlobalStateMgr.getCurrentState().getMetadataMgr();
-        Database db = metadataMgr.getDb(catalogName, params.db);
-
-        UserIdentity currentUser = null;
+        UserIdentity currentUser;
         if (params.isSetCurrent_user_ident()) {
             currentUser = UserIdentity.fromThrift(params.current_user_ident);
         } else {
             currentUser = UserIdentity.createAnalyzedUserIdentWithIp(params.user, params.user_ip);
         }
+        ConnectContext ctx = new ConnectContext(null);
+        ctx.setQualifiedUser(currentUser.getUser());
+        ctx.setCurrentUserIdentity(currentUser);
+        ctx.setThreadLocalInfo();
+
+        MetadataMgr metadataMgr = GlobalStateMgr.getCurrentState().getMetadataMgr();
+        Database db = metadataMgr.getDb(catalogName, params.db);
 
         if (db != null) {
             for (String tableName : metadataMgr.listTableNames(catalogName, params.db)) {
@@ -491,14 +499,19 @@ public class FrontendServiceImpl implements FrontendService.Iface {
             }
         }
 
-        Database db = GlobalStateMgr.getCurrentState().getDb(params.db);
-        long limit = params.isSetLimit() ? params.getLimit() : -1;
         UserIdentity currentUser;
         if (params.isSetCurrent_user_ident()) {
             currentUser = UserIdentity.fromThrift(params.current_user_ident);
         } else {
             currentUser = UserIdentity.createAnalyzedUserIdentWithIp(params.user, params.user_ip);
         }
+        ConnectContext ctx = new ConnectContext(null);
+        ctx.setQualifiedUser(currentUser.getUser());
+        ctx.setCurrentUserIdentity(currentUser);
+        ctx.setThreadLocalInfo();
+
+        Database db = GlobalStateMgr.getCurrentState().getDb(params.db);
+        long limit = params.isSetLimit() ? params.getLimit() : -1;
         if (db != null) {
             Locker locker = new Locker();
             locker.lockDatabase(db, LockType.READ);
@@ -533,6 +546,7 @@ public class FrontendServiceImpl implements FrontendService.Iface {
                         connectContext.setQualifiedUser(AuthenticationMgr.ROOT_USER);
                         connectContext.setCurrentUserIdentity(UserIdentity.ROOT);
                         connectContext.setCurrentRoleIds(Sets.newHashSet(PrivilegeBuiltinConstants.ROOT_ROLE_ID));
+                        connectContext.setThreadLocalInfo();
 
                         try {
                             List<TableName> allTables = view.getTableRefs();
@@ -585,6 +599,10 @@ public class FrontendServiceImpl implements FrontendService.Iface {
         } else {
             currentUser = UserIdentity.createAnalyzedUserIdentWithIp(params.user, params.user_ip);
         }
+        ConnectContext ctx = new ConnectContext(null);
+        ctx.setQualifiedUser(currentUser.getUser());
+        ctx.setCurrentUserIdentity(currentUser);
+        ctx.setThreadLocalInfo();
         Preconditions.checkState(params.isSetType() && TTableType.MATERIALIZED_VIEW.equals(params.getType()));
         return listMaterializedViewStatus(limit, matcher, currentUser, params);
     }
@@ -887,12 +905,16 @@ public class FrontendServiceImpl implements FrontendService.Iface {
         result.setColumns(columns);
 
         // database privs should be checked in analysis phrase
-        UserIdentity currentUser = null;
+        UserIdentity currentUser;
         if (params.isSetCurrent_user_ident()) {
             currentUser = UserIdentity.fromThrift(params.current_user_ident);
         } else {
             currentUser = UserIdentity.createAnalyzedUserIdentWithIp(params.user, params.user_ip);
         }
+        ConnectContext ctx = new ConnectContext(null);
+        ctx.setQualifiedUser(currentUser.getUser());
+        ctx.setCurrentUserIdentity(currentUser);
+        ctx.setThreadLocalInfo();
         long limit = params.isSetLimit() ? params.getLimit() : -1;
 
         // if user query schema meta such as "select * from information_schema.columns limit 10;",
