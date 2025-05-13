@@ -1070,7 +1070,7 @@ public class DefaultCoordinator extends Coordinator {
             ConnectContext ctx = connectContext;
             if (ctx != null) {
                 ctx.setErrorCodeOnce(status.getErrorCodeString());
-                connectContext.setErrorMsgOnce(status.getErrorMsg());
+                ctx.setErrorMsgOnce(status.getErrorMsg());
             }
             LOG.warn("exec state report failed status={}, query_id={}, instance_id={}, backend_id={}",
                     status, DebugUtil.printId(jobSpec.getQueryId()),
