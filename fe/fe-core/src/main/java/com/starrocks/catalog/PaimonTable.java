@@ -16,9 +16,10 @@
 package com.starrocks.catalog;
 
 import com.aliyun.datalake.catalog.CatalogClient;
-import com.aliyun.datalake.common.credential.SimpleStsCredentialsProvider;
+import com.aliyun.datalake.common.DlfDataToken;
 import com.aliyun.datalake.common.impl.Base64Util;
 import com.aliyun.datalake.core.DlfAuthContext;
+import com.aliyun.datalake.credential.SimpleStsCredentialsProvider;
 import com.aliyun.datalake.paimon.fs.DlfPaimonFileIO;
 import com.aliyun.datalake.paimon.table.DlfPaimonTable;
 import com.google.common.base.Joiner;
@@ -35,7 +36,6 @@ import com.starrocks.thrift.TTableType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.paimon.CoreOptions;
-import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.table.DataTable;
 import org.apache.paimon.types.DataField;

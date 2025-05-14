@@ -904,21 +904,16 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
             }
             jobInfo.add(loadingStatus.getLoadStatistic().toShowInfoStr());
             // warehouse
-<<<<<<< HEAD
-            if (RunMode.isSharedDataMode()) {
-                Warehouse warehouse = GlobalStateMgr.getCurrentState().getWarehouseMgr().getWarehouseAllowNull(warehouseId);
-                if (warehouse != null) {
-                    jobInfo.add(warehouse.getName());
-                } else {
-                    jobInfo.add(String.format("Warehouse id: %d not exist.", warehouseId));
-=======
             if (RunMode.getCurrentRunMode() == RunMode.SHARED_DATA) {
                 try {
-                    Warehouse warehouse = GlobalStateMgr.getCurrentState().getWarehouseMgr().getWarehouse(warehouseId);
-                    jobInfo.add(warehouse.getName());
+                    Warehouse warehouse = GlobalStateMgr.getCurrentState().getWarehouseMgr().getWarehouseAllowNull(warehouseId);
+                    if (warehouse != null) {
+                        jobInfo.add(warehouse.getName());
+                    } else {
+                        jobInfo.add(String.format("Warehouse id: %d not exist.", warehouseId));
+                    }
                 } catch (Exception e) {
                     jobInfo.add(e.getMessage());
->>>>>>> 7a8d3a175de ([Stella][Enhancement]Optimize load jobs observability for multi-warehouse)
                 }
             } else {
                 jobInfo.add("");
@@ -1079,6 +1074,7 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
                         info.setWarehouse(warehouse.getName());
                     } else {
                         info.setWarehouse(String.format("Warehouse id: %d not exist.", warehouseId));
+                    }
                 } catch (Exception e) {
                     info.setWarehouse(e.getMessage());
                 }

@@ -88,7 +88,6 @@ import org.apache.paimon.table.source.DataSplit;
 import org.apache.paimon.table.source.InnerTableScan;
 import org.apache.paimon.table.source.ReadBuilder;
 import org.apache.paimon.table.source.Split;
-import org.apache.paimon.table.system.SchemasTable;
 import org.apache.paimon.table.system.SnapshotsTable;
 import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataType;
