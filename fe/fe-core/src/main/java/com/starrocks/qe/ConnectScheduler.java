@@ -42,6 +42,7 @@ import com.starrocks.common.CloseableLock;
 import com.starrocks.common.Config;
 import com.starrocks.common.Pair;
 import com.starrocks.common.ThreadPoolManager;
+import com.starrocks.common.UserException;
 import com.starrocks.common.util.LogUtil;
 import com.starrocks.http.HttpConnectContext;
 import com.starrocks.mysql.MysqlCommand;
@@ -52,6 +53,7 @@ import com.starrocks.privilege.AccessDeniedException;
 import com.starrocks.privilege.PrivilegeType;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.analyzer.Authorizer;
+import com.starrocks.transaction.GlobalTransactionMgr;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -243,6 +245,23 @@ public class ConnectScheduler {
                         connCountByUser.remove(ctx.getQualifiedUser());
                     }
                 }
+
+                long multiTxnId = ctx.getRunningMultiTxnId();
+                if (multiTxnId != -1) {
+                    GlobalTransactionMgr transactionMgr = GlobalStateMgr.getCurrentState().getGlobalTransactionMgr();
+                    try {
+                        transactionMgr.abortMultiTxn(multiTxnId);
+                    } catch (UserException e) {
+                        LOG.warn("Failed to abort multi transaction {}, reason: {}", multiTxnId, e.getMessage(), e);
+                    }
+
+                    String msg = "finish a multi transaction, id: " + multiTxnId;
+                    ctx.getState().setOk(0, 0, msg);
+                    ctx.setRunningMultiTxnId(-1L);
+                    LOG.info("Abort multi transaction {} before connection(connectionId={}) closed.",
+                            multiTxnId, ctx.getConnectionId());
+                }
+
                 LOG.info("Connection closed. remote={}, connectionId={}, qualifiedUser={}, user.currConn={}",
                         ctx.getMysqlChannel().getRemoteHostPortString(), ctx.getConnectionId(),
                         ctx.getQualifiedUser(), conns != null ? Integer.toString(conns.get()) : "nil");

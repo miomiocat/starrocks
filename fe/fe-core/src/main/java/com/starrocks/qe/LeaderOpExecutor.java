@@ -141,6 +141,7 @@ public class LeaderOpExecutor {
                 ctx.getExecutor().setQueryStatistics(AuditStatisticsUtil.toProtobuf(tAuditStatistics));
             }
         }
+        ctx.setRunningMultiTxnId(result.getMulti_txn_id());
     }
 
     private void afterForward() throws DdlException {
@@ -248,6 +249,7 @@ public class LeaderOpExecutor {
         params.setForward_times(forwardTimes);
         params.setSession_id(ctx.getSessionId().toString());
         params.setConnectionId(ctx.getConnectionId());
+        params.setMulti_txn_id(ctx.getRunningMultiTxnId());
 
         TUserRoles currentRoles = new TUserRoles();
         Preconditions.checkState(ctx.getCurrentRoleIds() != null);

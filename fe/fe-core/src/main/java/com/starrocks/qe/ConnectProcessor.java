@@ -821,6 +821,9 @@ public class ConnectProcessor {
             UserIdentity currentUserIdentity = UserIdentity.fromThrift(request.getCurrent_user_ident());
             ctx.setCurrentUserIdentity(currentUserIdentity);
         }
+        if (request.isSetMulti_txn_id()) {
+            ctx.setRunningMultiTxnId(request.getMulti_txn_id());
+        }
 
         if (ctx.getCurrentUserIdentity() == null) {
             TMasterOpResult result = new TMasterOpResult();
@@ -1000,6 +1003,8 @@ public class ConnectProcessor {
                 result.setAudit_statistics(AuditStatisticsUtil.toThrift(audit));
             }
         }
+        // after begin stmt, we should bring running multi txn id back.
+        result.setMulti_txn_id(ctx.getRunningMultiTxnId());
         return result;
     }
 
