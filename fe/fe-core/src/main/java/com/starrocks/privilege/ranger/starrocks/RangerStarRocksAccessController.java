@@ -455,11 +455,21 @@ public class RangerStarRocksAccessController extends RangerAccessController {
     @Override
     public void checkWarehouseAction(UserIdentity currentUser, Set<Long> roleIds, String name, PrivilegeType privilegeType)
             throws AccessDeniedException {
-        throw new AccessDeniedException();
+        hasPermission(
+                RangerStarRocksResource.builder()
+                        .setWarehouse(name)
+                        .build(),
+                currentUser,
+                privilegeType);
     }
 
     @Override
     public void checkAnyActionOnWarehouse(UserIdentity currentUser, Set<Long> roleIds, String name) throws AccessDeniedException {
-        throw new AccessDeniedException();
+        hasPermission(
+                RangerStarRocksResource.builder()
+                        .setWarehouse(name)
+                        .build(),
+                currentUser,
+                PrivilegeType.ANY);
     }
 }
