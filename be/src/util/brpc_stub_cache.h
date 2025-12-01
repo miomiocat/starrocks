@@ -119,13 +119,13 @@ private:
             }
 
             const auto current_time_ms = MonotonicMillis();
-            const auto it = _id_to_last_access_time.find(idx);
-            _id_to_last_access_time.emplace(idx, current_time_ms);
-            if (it != _id_to_last_access_time.end()) {
+            if (const auto it = _id_to_last_access_time.find(idx); it != _id_to_last_access_time.end()) {
                 const auto last_access_time = it->second;
+                _id_to_last_access_time[idx] = current_time_ms;
                 return last_access_time + config::brpc_stub_cache_expire_s * 1000 < current_time_ms;
             }
             // no record, should treat as expired.
+            _id_to_last_access_time[idx] = current_time_ms;
             return true;
         }
 
@@ -136,7 +136,7 @@ private:
                     return nullptr;
                 }
                 if (config::brpc_stub_cache_expire_s > 0) {
-                    _id_to_last_access_time.emplace(_stubs.size(), MonotonicMillis());
+                    _id_to_last_access_time[_stubs.size()] = MonotonicMillis();
                 }
                 _stubs.push_back(stub);
                 return stub;
