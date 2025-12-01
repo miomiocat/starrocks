@@ -25,6 +25,7 @@ import com.starrocks.catalog.HiveTable;
 import com.starrocks.catalog.PartitionKey;
 import com.starrocks.catalog.Table;
 import com.starrocks.common.AlreadyExistsException;
+import com.starrocks.common.Config;
 import com.starrocks.common.DdlException;
 import com.starrocks.common.MetaNotFoundException;
 import com.starrocks.common.UserException;
@@ -79,6 +80,8 @@ import static com.starrocks.server.CatalogMgr.ResourceMappingCatalog.isResourceM
 public class HiveMetadata implements ConnectorMetadata {
     private static final Logger LOG = LogManager.getLogger(HiveMetadata.class);
     public static final String STARROCKS_QUERY_ID = "starrocks_query_id";
+    // Filter out partitions with hivevar: prefix (e.g., ${hivevar:do_date}) which are variable partitions, not real partitions
+    private static final String HIVE_VAR_PREFIX = "hivevar:";
     private final String catalogName;
     private final HdfsEnvironment hdfsEnvironment;
     private final HiveMetastoreOperations hmsOps;
@@ -218,7 +221,8 @@ public class HiveMetadata implements ConnectorMetadata {
 
     @Override
     public List<String> listPartitionNames(String dbName, String tblName, long snapshotId) {
-        return hmsOps.getPartitionKeys(dbName, tblName);
+        List<String> partitionNames = hmsOps.getPartitionKeys(dbName, tblName);
+        return filterInvalidPartitions(partitionNames);
     }
 
     @Override
@@ -483,5 +487,36 @@ public class HiveMetadata implements ConnectorMetadata {
         HivePartitionWithStats partitionWithStats =
                 new HivePartitionWithStats(partitionString, hivePartition, HivePartitionStats.empty());
         hmsOps.addPartitions(table.getDbName(), table.getTableName(), Lists.newArrayList(partitionWithStats));
+    }
+
+    /**
+     * Filter out invalid partitions that contain hive_var: prefix.
+     * These are variable partitions returned by Hive Metastore but are not real partitions.
+     * The filtering behavior is controlled by the configuration {@link Config#enable_filter_hive_var_partitions}.
+     * 
+     * @param partitionNames list of partition names to filter
+     * @return filtered list of valid partition names
+     */
+    private List<String> filterInvalidPartitions(List<String> partitionNames) {
+        if (partitionNames == null || partitionNames.isEmpty()) {
+            return partitionNames;
+        }
+        // If filtering is disabled, return the original list
+        if (!Config.enable_filter_hive_var_partitions) {
+            return partitionNames;
+        }
+        return partitionNames.stream()
+                .filter(partitionName -> {
+                    if (partitionName == null) {
+                        return false;
+                    }
+                    // Filter out partitions that contain hive_var: prefix (e.g., hive_var:do_date)
+                    if (partitionName.contains(HIVE_VAR_PREFIX)) {
+                        LOG.debug("Filtering out invalid partition: {}", partitionName);
+                        return false;
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
     }
 }
