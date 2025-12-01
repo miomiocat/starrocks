@@ -353,6 +353,7 @@ Status UpdateConfigAction::update_config(const std::string& name, const std::str
         UPDATE_STARLET_CONFIG(starlet_fslib_s3client_nonread_retry_scale_factor,
                               fslib_s3client_nonread_retry_scale_factor);
         UPDATE_STARLET_CONFIG(starlet_fslib_s3client_connect_timeout_ms, fslib_s3client_connect_timeout_ms);
+        UPDATE_STARLET_CONFIG(starlet_fslib_s3client_read_oss_max_retries, fslib_s3client_read_oss_max_retries);
         if (config::object_storage_request_timeout_ms >= 0 &&
             config::object_storage_request_timeout_ms <= std::numeric_limits<int32_t>::max()) {
             UPDATE_STARLET_CONFIG(object_storage_request_timeout_ms, fslib_s3client_request_timeout_ms);

@@ -1085,6 +1085,7 @@ CONF_mInt32(starlet_fs_read_prefetch_threadpool_size, "128");
 CONF_mInt32(starlet_fslib_s3client_nonread_max_retries, "5");
 CONF_mInt32(starlet_fslib_s3client_nonread_retry_scale_factor, "200");
 CONF_mInt32(starlet_fslib_s3client_connect_timeout_ms, "1000");
+CONF_mInt32(starlet_fslib_s3client_read_oss_max_retries, "3");
 // make starlet_fslib_s3client_request_timeout_ms as an alias of the object_storage_request_timeout_ms
 // NOTE: need to handle the negative value properly
 CONF_Alias(object_storage_request_timeout_ms, starlet_fslib_s3client_request_timeout_ms);
