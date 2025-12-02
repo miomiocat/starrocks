@@ -127,6 +127,10 @@ private:
 
     void _append_error_msg(const std::string&, const std::string& error_msg);
 
+    bool _is_routine_load();
+
+    std::string _get_current_meta_msg();
+
 private:
     RuntimeState* _state = nullptr;
     ScannerCounter* _counter = nullptr;
