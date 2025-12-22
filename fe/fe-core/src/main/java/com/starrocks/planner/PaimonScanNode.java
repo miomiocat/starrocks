@@ -80,7 +80,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Formattable;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -90,7 +89,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.xml.crypto.Data;
 
 import static com.starrocks.common.profile.Tracers.Module.EXTERNAL;
 import static com.starrocks.thrift.TExplainLevel.VERBOSE;
@@ -196,7 +194,7 @@ public class PaimonScanNode extends ScanNode {
         for (Split split : splits) {
             if (split instanceof DataSplit || split instanceof FormatDataSplit) {
                 Optional<List<RawFile>> optionalRawFiles = split.convertToRawFiles();
-                boolean nativeSupportedFormat = optionalRawFiles.isPresent()
+                boolean nativeSupportedFormat = !paimonTable.isSystemTable() && optionalRawFiles.isPresent()
                         && optionalRawFiles.get().stream().allMatch(p -> fromType(p.format()) != THdfsFileFormat.UNKNOWN) ||
                         split instanceof FormatDataSplit && (formatTableFormat == FormatTable.Format.ORC || formatTableFormat == FormatTable.Format.PARQUET);
 
