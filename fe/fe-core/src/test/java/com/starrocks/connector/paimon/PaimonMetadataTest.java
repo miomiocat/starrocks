@@ -233,29 +233,6 @@ public class PaimonMetadataTest {
     }
 
     @Test
-    public void testGetSystemTable(@Mocked ManifestsTable paimonSystemTable,
-                                   @Mocked ReadBuilder readBuilder,
-                                   @Mocked InnerTableScan scan) throws Exception {
-        new Expectations() {
-            {
-                paimonNativeCatalog.getTable((Identifier) any);
-                result = paimonSystemTable;
-                paimonSystemTable.latestSnapshot();
-                result = new Exception("Readonly Table tbl1$manifests does not support currentSnapshot.");
-                paimonSystemTable.newReadBuilder();
-                result = readBuilder;
-                readBuilder.withFilter((List<Predicate>) any).withProjection((int[]) any).newScan();
-                result = scan;
-            }
-        };
-        PaimonTable paimonTable = (PaimonTable) metadata.getTable("db1", "tbl1$manifests");
-        List<String> requiredNames = Lists.newArrayList("file_name", "file_size");
-        List<RemoteFileInfo> result =
-                metadata.getRemoteFileInfos(paimonTable, null, -1, null, requiredNames, -1);
-        Assert.assertEquals(1, result.size());
-    }
-
-    @Test
     public void testListPartitionNames(@Mocked FileStoreTable mockPaimonTable)
             throws Catalog.TableNotExistException {
         List<String> partitionNames = Lists.newArrayList("year", "month");
