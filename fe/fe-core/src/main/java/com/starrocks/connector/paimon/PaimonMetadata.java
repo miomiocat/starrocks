@@ -27,6 +27,7 @@ import com.starrocks.common.Config;
 import com.starrocks.common.DdlException;
 import com.starrocks.common.profile.Timer;
 import com.starrocks.common.profile.Tracers;
+import com.starrocks.common.util.TimeUtils;
 import com.starrocks.connector.ColumnTypeConverter;
 import com.starrocks.connector.ConnectorMetadata;
 import com.starrocks.connector.HdfsEnvironment;
@@ -83,6 +84,7 @@ import org.apache.paimon.utils.PartitionPathUtils;
 import org.apache.paimon.utils.StringUtils;
 
 import java.io.ByteArrayInputStream;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -595,7 +597,9 @@ public class PaimonMetadata implements ConnectorMetadata {
         List<ScalarOperator> scalarOperators = Utils.extractConjuncts(predicate);
         List<Predicate> predicates = new ArrayList<>(scalarOperators.size());
 
-        PaimonPredicateConverter converter = new PaimonPredicateConverter(paimonTable.getNativeTable().rowType());
+        ZoneId sessionZoneId = ZoneId.of(TimeUtils.getSessionTimeZone());
+        PaimonPredicateConverter converter =
+                new PaimonPredicateConverter(paimonTable.getNativeTable().rowType(), sessionZoneId);
         for (ScalarOperator operator : scalarOperators) {
             Predicate filter = converter.convert(operator);
             if (filter != null) {
