@@ -110,6 +110,8 @@ import static org.apache.paimon.io.DataFileMeta.EMPTY_MAX_KEY;
 import static org.apache.paimon.io.DataFileMeta.EMPTY_MIN_KEY;
 import static org.apache.paimon.stats.SimpleStats.EMPTY_STATS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class PaimonMetadataTest {
     @Mocked
@@ -660,5 +662,55 @@ public class PaimonMetadataTest {
                         colRefToColumnMetaMap, null, null, -1);
         Assert.assertEquals(tableStatistics.getColumnStatistics().size(), colRefToColumnMetaMap.size());
 
+    }
+
+    @Test
+    public void testOnlyHasPartitionPredicate(@Mocked FileStoreTable paimonNativeTable)
+            throws Catalog.TableNotExistException {
+        List<DataField> fields = new ArrayList<>();
+        fields.add(new DataField(0, "pt", SerializationUtils.newStringType(false)));
+        fields.add(new DataField(1, "event", SerializationUtils.newStringType(false)));
+        fields.add(new DataField(2, "data", SerializationUtils.newStringType(false)));
+
+        new Expectations() {
+            {
+                paimonNativeCatalog.getTable((Identifier) any);
+                result = paimonNativeTable;
+                paimonNativeTable.rowType().getFields();
+                result = fields;
+                paimonNativeTable.partitionKeys();
+                result = Lists.newArrayList("pt");
+            }
+        };
+
+        PaimonTable table = (PaimonTable) metadata.getTable("db1", "tbl1");
+
+        // 1: Empty predicates - should return true
+        List<ScalarOperator> emptyPredicates = Lists.newArrayList();
+        assertTrue(PaimonMetadata.onlyHasPartitionPredicate(table, emptyPredicates));
+
+        // 2: Only partition column predicate - should return true
+        ColumnRefOperator ptColumn = new ColumnRefOperator(1, Type.STRING, "pt", false);
+        ScalarOperator ptEqualPredicate = new BinaryPredicateOperator(BinaryType.EQ, ptColumn,
+                ConstantOperator.createVarchar("20260108"));
+        List<ScalarOperator> partitionOnlyPredicates = Lists.newArrayList(ptEqualPredicate);
+        assertTrue(PaimonMetadata.onlyHasPartitionPredicate(table, partitionOnlyPredicates));
+
+        // 3: Only partition column with range predicate - should return true
+        ScalarOperator ptGreaterPredicate = new BinaryPredicateOperator(BinaryType.GE, ptColumn,
+                ConstantOperator.createVarchar("20260101"));
+        List<ScalarOperator> partitionRangePredicates = Lists.newArrayList(ptGreaterPredicate);
+        assertTrue(PaimonMetadata.onlyHasPartitionPredicate(table, partitionRangePredicates));
+
+        // 4: Non-partition column predicate - should return false
+        ColumnRefOperator eventColumn = new ColumnRefOperator(2, Type.STRING, "event", false);
+        ScalarOperator eventEqualPredicate = new BinaryPredicateOperator(BinaryType.EQ, eventColumn,
+                ConstantOperator.createVarchar("click"));
+        List<ScalarOperator> nonPartitionPredicates = Lists.newArrayList(eventEqualPredicate);
+        assertFalse(PaimonMetadata.onlyHasPartitionPredicate(table, nonPartitionPredicates));
+
+        // 5: Mixed partition and non-partition predicates - should return false
+        List<ScalarOperator> mixedPredicates = Lists.newArrayList(ptEqualPredicate, eventEqualPredicate);
+        assertFalse(PaimonMetadata.onlyHasPartitionPredicate(table, mixedPredicates));
     }
 }
