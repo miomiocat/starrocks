@@ -85,6 +85,10 @@ public class LakeTableHelper {
         boolean succ = cleaner.cleanTable();
         if (succ) {
             table.removeTabletsFromInvertedIndex();
+            // Delete shard group meta from StarManager after successfully cleaning table data.
+            // Without this step, orphan shard groups would accumulate in StarManager until
+            // cleaned up by the background StarMgrMetaSyncer after shard_group_clean_threshold_sec.
+            deleteTableShardGroupMeta(table);
         }
         return succ;
     }
@@ -271,6 +275,30 @@ public class LakeTableHelper {
             StarOSAgent starOSAgent = GlobalStateMgr.getCurrentState().getStarOSAgent();
             starOSAgent.deleteShardGroup(new ArrayList<>(needRemoveShardGroupIdSet));
             LOG.debug("Deleted shard group related to partition {}, group ids: {}", partition.getId(),
+                    needRemoveShardGroupIdSet);
+        }
+    }
+
+    /**
+     * Delete all shard group meta (shards meta included) for the given table from StarManager.
+     * This method should be called after the table's remote data has been cleaned up successfully.
+     */
+    static void deleteTableShardGroupMeta(OlapTable table) {
+        Preconditions.checkState(table.isCloudNativeTableOrMaterializedView());
+        Set<Long> needRemoveShardGroupIdSet = new HashSet<>();
+        for (Partition partition : table.getAllPartitions()) {
+            for (PhysicalPartition subPartition : partition.getSubPartitions()) {
+                // TODO backport notion:
+                // From v3.4, each MaterializedIndex will have its own shard group id,
+                // so we should gather by calling `index.getShardGroupId()`
+                // Right now (V3.3), it's fine to use subPartition's getShardGroupId()
+                needRemoveShardGroupIdSet.add(subPartition.getShardGroupId());
+            }
+        }
+        if (!needRemoveShardGroupIdSet.isEmpty()) {
+            StarOSAgent starOSAgent = GlobalStateMgr.getCurrentState().getStarOSAgent();
+            starOSAgent.deleteShardGroup(new ArrayList<>(needRemoveShardGroupIdSet));
+            LOG.info("Deleted shard groups for table {}, group ids: {}", table.getName(),
                     needRemoveShardGroupIdSet);
         }
     }
