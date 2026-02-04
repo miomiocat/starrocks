@@ -16,7 +16,9 @@ package com.starrocks.scheduler;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.starrocks.common.Config;
 import com.starrocks.common.FeConstants;
+import com.starrocks.common.util.PropertyAnalyzer;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.utframe.UtFrameUtils;
@@ -28,6 +30,8 @@ import org.junit.Test;
 
 import java.util.List;
 import java.util.Map;
+
+import static com.starrocks.scheduler.MVRefreshTestBase.createAndRefreshMv;
 
 public class TaskRunManagerTest {
 
@@ -189,5 +193,175 @@ public class TaskRunManagerTest {
             ExecuteOption option2 = makeExecuteOption(true, false, 2, prop2);
             Assert.assertTrue(option1.isMergeableWith(option2));
         }
+    }
+
+    /**
+     * Test warehouse selection logic when refreshing materialized view
+     * Covers the new feature: enable_mv_manual_refresh_use_context_warehouse
+     */
+    @Test
+    public void testManualRefreshMVWarehouseSelection() throws Exception {
+
+        createAndRefreshMv("create materialized view `test_mv_wh`" +
+                " partition by id_date" +
+                " distributed by hash(`t1a`)" +
+                " as" +
+                " select t1a, id_date, t1b from table_with_partition");
+        // Test warehouses
+        final long MV_WAREHOUSE_ID = 1001L;
+        final String MV_WAREHOUSE_NAME = "mv_warehouse";
+        final long CONTEXT_WAREHOUSE_ID = 1002L;
+        final String CONTEXT_WAREHOUSE_NAME = "context_warehouse";
+        String dbName = "test";
+        GlobalStateMgr globalStateMgr = connectContext.getGlobalStateMgr();
+        globalStateMgr.getWarehouseMgr().addWarehouse(new DefaultWarehouse(MV_WAREHOUSE_ID, MV_WAREHOUSE_NAME));
+        globalStateMgr.getWarehouseMgr().addWarehouse(new DefaultWarehouse(CONTEXT_WAREHOUSE_ID, CONTEXT_WAREHOUSE_NAME));
+
+        boolean originalConfigValue = Config.enable_mv_manual_refresh_use_context_warehouse;
+        // Test case 1: Config enabled + manual refresh + has parentRunCtx
+        // Expected: Use warehouse from connection context
+        {
+            Config.enable_mv_manual_refresh_use_context_warehouse = true;
+
+            // Create parent context with CONTEXT_WAREHOUSE
+            ConnectContext parentCtx = new ConnectContext(null);
+            parentCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            parentCtx.setCurrentWarehouse(CONTEXT_WAREHOUSE_NAME);
+
+            // Create TaskRun with manual refresh
+            Task task = new Task("test_mv_task");
+            task.setSource(Constants.TaskSource.MV);
+            task.setDbName(dbName);
+            task.setDefinition("SELECT 1");
+            Map<String, String> taskProperties = Maps.newHashMap();
+            taskProperties.put(TaskRun.MV_ID, "10001");
+            task.setProperties(taskProperties);
+
+            ExecuteOption executeOption = new ExecuteOption(task);
+            executeOption.setManual(true);
+
+            TaskRun taskRun = TaskRunBuilder.newBuilder(task)
+                    .setExecuteOption(executeOption)
+                    .setConnectContext(parentCtx)
+                    .build();
+
+            // Execute refreshTaskProperties
+            ConnectContext runCtx = new ConnectContext(null);
+            runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            runCtx.setDatabase("test");
+
+            Map<String, String> properties = taskRun.refreshTaskProperties(runCtx);
+
+            // Verify: should use CONTEXT_WAREHOUSE
+            Assert.assertEquals("Should use warehouse from connection context",
+                    CONTEXT_WAREHOUSE_NAME, properties.get(PropertyAnalyzer.PROPERTIES_WAREHOUSE));
+            Assert.assertEquals("Context warehouse should be set in runCtx",
+                    CONTEXT_WAREHOUSE_NAME, runCtx.getCurrentWarehouseName());
+        }
+
+        // Test case 2: Config disabled
+        // Expected: Use warehouse from MV property
+        {
+            Config.enable_mv_manual_refresh_use_context_warehouse = false;
+
+            ConnectContext parentCtx = new ConnectContext(null);
+            parentCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            parentCtx.setCurrentWarehouse(CONTEXT_WAREHOUSE_NAME);
+
+            Task task = new Task("test_mv_task");
+            task.setSource(Constants.TaskSource.MV);
+            task.setDbName("test");
+            task.setDefinition("SELECT 1");
+            Map<String, String> taskProperties = Maps.newHashMap();
+            taskProperties.put(TaskRun.MV_ID, "10001");
+            task.setProperties(taskProperties);
+
+            ExecuteOption executeOption = new ExecuteOption(task);
+            executeOption.setManual(true);
+
+            TaskRun taskRun = TaskRunBuilder.newBuilder(task)
+                    .setExecuteOption(executeOption)
+                    .setConnectContext(parentCtx)
+                    .build();
+
+            ConnectContext runCtx = new ConnectContext(null);
+            runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            runCtx.setDatabase("test");
+
+            Map<String, String> properties = taskRun.refreshTaskProperties(runCtx);
+
+            // Verify: should use MV_WAREHOUSE
+            Assert.assertEquals("Should use warehouse from MV property when config disabled",
+                    MV_WAREHOUSE_NAME, properties.get(PropertyAnalyzer.PROPERTIES_WAREHOUSE));
+        }
+
+        // Test case 3: Config enabled but not manual refresh (automatic refresh)
+        // Expected: Use warehouse from MV property
+        {
+            Config.enable_mv_manual_refresh_use_context_warehouse = true;
+
+            ConnectContext parentCtx = new ConnectContext(null);
+            parentCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            parentCtx.setCurrentWarehouse(CONTEXT_WAREHOUSE_NAME);
+
+            Task task = new Task("test_mv_task");
+            task.setSource(Constants.TaskSource.MV);
+            task.setDbName("test");
+            task.setDefinition("SELECT 1");
+            Map<String, String> taskProperties = Maps.newHashMap();
+            taskProperties.put(TaskRun.MV_ID, "10001");
+            task.setProperties(taskProperties);
+
+            ExecuteOption executeOption = new ExecuteOption(task);
+            executeOption.setManual(false);  // Automatic refresh
+
+            TaskRun taskRun = TaskRunBuilder.newBuilder(task)
+                    .setExecuteOption(executeOption)
+                    .setConnectContext(parentCtx)
+                    .build();
+
+            ConnectContext runCtx = new ConnectContext(null);
+            runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            runCtx.setDatabase("test");
+
+            Map<String, String> properties = taskRun.refreshTaskProperties(runCtx);
+
+            // Verify: should use MV_WAREHOUSE for automatic refresh
+            Assert.assertEquals("Should use warehouse from MV property for automatic refresh",
+                    MV_WAREHOUSE_NAME, properties.get(PropertyAnalyzer.PROPERTIES_WAREHOUSE));
+        }
+
+        // Test case 4: Config enabled + manual refresh but no parentRunCtx
+        // Expected: Use warehouse from MV property (fallback)
+        {
+            Config.enable_mv_manual_refresh_use_context_warehouse = true;
+
+            Task task = new Task("test_mv_task");
+            task.setSource(Constants.TaskSource.MV);
+            task.setDbName("test");
+            task.setDefinition("SELECT 1");
+            Map<String, String> taskProperties = Maps.newHashMap();
+            taskProperties.put(TaskRun.MV_ID, "10001");
+            task.setProperties(taskProperties);
+
+            ExecuteOption executeOption = new ExecuteOption(task);
+            executeOption.setManual(true);
+
+            TaskRun taskRun = TaskRunBuilder.newBuilder(task)
+                    .setExecuteOption(executeOption)
+                    .setConnectContext(null)  // No parent context
+                    .build();
+
+            ConnectContext runCtx = new ConnectContext(null);
+            runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+            runCtx.setDatabase("test");
+
+            Map<String, String> properties = taskRun.refreshTaskProperties(runCtx);
+
+            // Verify: should fallback to MV_WAREHOUSE
+            Assert.assertEquals("Should fallback to MV warehouse when no parent context",
+                    MV_WAREHOUSE_NAME, properties.get(PropertyAnalyzer.PROPERTIES_WAREHOUSE));
+        }
+        Config.enable_mv_manual_refresh_use_context_warehouse = originalConfigValue;
     }
 }
