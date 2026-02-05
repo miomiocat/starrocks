@@ -1269,7 +1269,7 @@ public class PlanFragmentBuilder {
                 prepareMinMaxExpr(scanNodePredicates, node.getScanOperatorPredicates(), context, referenceTable);
             } catch (Exception e) {
                 LOG.warn("Paimon scan node get scan range locations failed : ", e);
-                throw new StarRocksPlannerException(e.getMessage(), INTERNAL_ERROR);
+                throw new StarRocksPlannerException(e.getMessage(), INTERNAL_ERROR, e);
             }
 
             paimonScanNode.setLimit(node.getLimit());

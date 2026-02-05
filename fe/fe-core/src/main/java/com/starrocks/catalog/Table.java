@@ -128,6 +128,8 @@ public class Table extends MetaObject implements Writable, GsonPostProcessable, 
         HIVE_VIEW,
         @SerializedName("ICEBERG_VIEW")
         ICEBERG_VIEW,
+        @SerializedName("PAIMON_VIEW")
+        PAIMON_VIEW,
         @SerializedName("FLUSS")
         FLUSS;
 
@@ -321,12 +323,16 @@ public class Table extends MetaObject implements Writable, GsonPostProcessable, 
         return type == TableType.ICEBERG_VIEW;
     }
 
+    public boolean isPaimonView() {
+        return type == TableType.PAIMON_VIEW;
+    }
+
     public boolean isView() {
         return isOlapView() || isConnectorView();
     }
 
     public boolean isConnectorView() {
-        return isHiveView() || isIcebergView();
+        return isHiveView() || isIcebergView() || isPaimonView();
     }
 
     public boolean isOlapTableOrMaterializedView() {
