@@ -313,12 +313,31 @@ public class OdpsMetadata implements ConnectorMetadata {
     @Override
     public void refreshTable(String srDbName, Table table, List<String> partitionNames, boolean onlyCachedPartitions) {
         OdpsTableName odpsTableName = OdpsTableName.of(srDbName, table.getName());
+        LOG.info("Refreshing ODPS table cache: db={}, table={}, partitions={}",
+                srDbName, table.getName(), partitionNames);
+
+        // Invalidate table name cache for the database to handle new/dropped tables
+        tableNameCache.invalidate(srDbName);
+
+        // Invalidate and synchronously reload table metadata cache
         tableCache.invalidate(odpsTableName);
-        get(tableCache, odpsTableName);
+        tableCache.refresh(odpsTableName);
+
+        // Invalidate and synchronously reload partition cache for partitioned tables
         if (!table.isUnPartitioned()) {
             partitionCache.invalidate(odpsTableName);
-            get(partitionCache, odpsTableName);
+            partitionCache.refresh(odpsTableName);
         }
+
+        LOG.info("Finished refreshing ODPS table cache: db={}, table={}", srDbName, table.getName());
+    }
+
+    @Override
+    public void clear() {
+        LOG.info("Clearing all ODPS metadata caches for catalog: {}", catalogName);
+        tableNameCache.invalidateAll();
+        tableCache.invalidateAll();
+        partitionCache.invalidateAll();
     }
 
     @Override
