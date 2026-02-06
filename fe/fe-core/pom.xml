@@ -38,6 +38,7 @@ under the License.
         <starrocks.home>${basedir}/../../</starrocks.home>
         <fe_ut_parallel>${env.FE_UT_PARALLEL}</fe_ut_parallel>
         <paimon.version>1-ali-20.1</paimon.version>
+        <lance.version>0.35.0-ali-1.2</lance.version>
         <dlf.sdk.version>1-ali-20.1</dlf.sdk.version>
         <fluss.version>jdk8-0.8-sr-SNAPSHOT</fluss.version>
         <flink.version>1.20.1</flink.version>
@@ -679,6 +680,13 @@ under the License.
         </dependency>
 
         <dependency>
+            <groupId>com.lancedb</groupId>
+            <artifactId>lance-core</artifactId>
+            <version>${lance.version}</version>
+            <classifier>linux</classifier>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.paimon</groupId>
             <artifactId>paimon-bundle</artifactId>
             <version>${paimon.version}</version>
@@ -687,6 +695,12 @@ under the License.
         <dependency>
             <groupId>org.apache.paimon</groupId>
             <artifactId>paimon-jindo</artifactId>
+            <version>${paimon.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-lance</artifactId>
             <version>${paimon.version}</version>
         </dependency>
 
