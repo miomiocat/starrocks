@@ -60,19 +60,17 @@ public class OdpsSplitScanner extends ConnectorScanner {
     private final String projectName;
     private final String tableName;
     private final String endpoint;
-    private final InputSplit inputSplit;
     private final String[] requiredFields;
-    private final Column[] requireColumns;
-    private final ColumnType[] requiredTypes;
+    private Column[] requireColumns;
+    private ColumnType[] requiredTypes;
     private final int fetchSize;
     private final ClassLoader classLoader;
-    private final EnvironmentSettings settings;
-    private final TableBatchReadSession scan;
     private SplitReader<VectorSchemaRoot> reader;
     private Map<String, Integer> nameIndexMap;
+    private Map<String, String> scanParams;
 
     private final long startTime;
-    private final long splitId;
+    private long splitId;
 
     private final String timezone;
 
@@ -81,28 +79,35 @@ public class OdpsSplitScanner extends ConnectorScanner {
         this.projectName = params.get("project_name");
         this.tableName = params.get("table_name");
         this.requiredFields = ScannerHelper.splitAndOmitEmptyStrings(params.get("required_fields"), ",");
+        this.endpoint = params.get("endpoint");
+        this.timezone = params.get("time_zone");
+        this.startTime = System.currentTimeMillis();
+        this.scanParams = params;
+        this.classLoader = this.getClass().getClassLoader();
+    }
 
-        this.scan = new TableReadSessionBuilder().fromJson(params.get("read_session")).buildBatchReadSession();
-        String splitPolicy = params.get("split_policy");
-        String sessionId = params.get("session_id");
+    public void initReader() throws IOException {
+        TableBatchReadSession scan = new TableReadSessionBuilder().fromJson(scanParams.get("read_session"))
+                .buildBatchReadSession();
+        String splitPolicy = scanParams.get("split_policy");
+        String sessionId = scanParams.get("session_id");
+        InputSplit inputSplit;
         switch (splitPolicy) {
             case "size":
-                this.inputSplit = new IndexedInputSplit(sessionId, Integer.parseInt(params.get("split_index")));
-                this.splitId = Long.parseLong(params.get("split_index"));
+                inputSplit = new IndexedInputSplit(sessionId, Integer.parseInt(scanParams.get("split_index")));
+                this.splitId = Long.parseLong(scanParams.get("split_index"));
                 break;
             case "row_offset":
-                this.inputSplit = new RowRangeInputSplit(sessionId, Long.parseLong(params.get("start_index")),
-                        Long.parseLong(params.get("num_record")));
-                this.splitId = Long.parseLong(params.get("start_index"));
+                inputSplit = new RowRangeInputSplit(sessionId, Long.parseLong(scanParams.get("start_index")),
+                        Long.parseLong(scanParams.get("num_record")));
+                this.splitId = Long.parseLong(scanParams.get("start_index"));
                 break;
             default:
                 throw new RuntimeException("unknown split policy: " + splitPolicy);
         }
         LOG.info("Start read split {}.", splitId);
-        this.endpoint = params.get("endpoint");
 
-        this.classLoader = this.getClass().getClassLoader();
-        Account account = new AliyunAccount(params.get("access_id"), params.get("access_key"));
+        Account account = new AliyunAccount(scanParams.get("access_id"), scanParams.get("access_key"));
         Odps odps = new Odps(account);
         odps.setEndpoint(endpoint);
 
@@ -119,25 +124,23 @@ public class OdpsSplitScanner extends ConnectorScanner {
         EnvironmentSettings.Builder builder = EnvironmentSettings.newBuilder().withServiceEndpoint(endpoint)
                 .withRestOptions(RestOptions.newBuilder().witUserAgent("StarRocks").build())
                 .withCredentials(Credentials.newBuilder().withAccount(account).build());
-        if (!StringUtils.isNullOrEmpty(params.get("tunnel_endpoint"))) {
-            builder.withTunnelEndpoint(params.get("tunnel_endpoint"));
+        if (!StringUtils.isNullOrEmpty(scanParams.get("tunnel_endpoint"))) {
+            builder.withTunnelEndpoint(scanParams.get("tunnel_endpoint"));
         }
-        if (!StringUtils.isNullOrEmpty(params.get("quota_name"))) {
-            builder.withQuotaName(params.get("quota_name"));
+        if (!StringUtils.isNullOrEmpty(scanParams.get("quota_name"))) {
+            builder.withQuotaName(scanParams.get("quota_name"));
         }
-        settings = builder.build();
-
-        this.timezone = params.get("time_zone");
-        this.startTime = System.currentTimeMillis();
+        EnvironmentSettings settings = builder.build();
+        reader = scan.createArrowReader(inputSplit,
+                ReaderOptions.newBuilder().withMaxBatchRowCount(fetchSize)
+                        .withCompressionCodec(CompressionCodec.ZSTD)
+                        .withSettings(settings).build());
     }
 
     @Override
     public void open() throws IOException {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            reader = scan.createArrowReader(this.inputSplit,
-                    ReaderOptions.newBuilder().withMaxBatchRowCount(fetchSize)
-                            .withCompressionCodec(CompressionCodec.ZSTD)
-                            .withSettings(settings).build());
+            initReader();
             initOffHeapTableWriter(requiredTypes, requiredFields, fetchSize);
         } catch (Exception e) {
             close();
